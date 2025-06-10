@@ -16,6 +16,7 @@
     .settings { padding: 10px; border-top: 1px solid #ccc; }
     .delete-btn { background-color: red; color: white; border: none; padding: 4px 8px; cursor: pointer; border-radius: 4px; }
     .droppable-hover { background-color: #e0ffe0; }
+    tr.dragging { opacity: 0.5; }
   </style>
 </head>
 <body>
@@ -97,6 +98,7 @@
         item.dataset.docIndex = index;
         item.addEventListener('dragstart', (e) => {
           e.dataTransfer.setData('text/plain', doc);
+          e.dataTransfer.setData('source', 'list');
         });
         docList.appendChild(item);
       });
@@ -136,12 +138,17 @@
     function handleDrop(e) {
       e.preventDefault();
       const doc = e.dataTransfer.getData('text/plain');
+      const source = e.dataTransfer.getData('source');
+      const existing = [...docBody.querySelectorAll('tr')].some(row => row.children[1].textContent === doc);
+      if (existing) return;
+
       const row = document.createElement('tr');
       row.draggable = true;
       row.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/row', row.innerHTML);
-        row.remove();
-        updateIndexes();
+        e.dataTransfer.setData('text/plain', doc);
+        e.dataTransfer.setData('source', 'table');
+        row.classList.add('dragging');
+        setTimeout(() => row.classList.remove('dragging'), 0);
       });
       row.innerHTML = `
         <td></td>
@@ -157,16 +164,13 @@
 
     function handleRemove(e) {
       e.preventDefault();
-      const data = e.dataTransfer.getData('text/row');
-      if (data) {
-        const temp = document.createElement('table');
-        temp.innerHTML = `<tbody>${data}</tbody>`;
-        const content = temp.querySelector('tr td:nth-child(2)').textContent;
-        if (!uniqueDocuments.includes(content)) {
-          uniqueDocuments.push(content);
-          renderList();
-          updateSelectOptions();
-        }
+      const doc = e.dataTransfer.getData('text/plain');
+      const source = e.dataTransfer.getData('source');
+      if (source === 'table') {
+        const rows = [...docBody.querySelectorAll('tr')];
+        const rowToRemove = rows.find(r => r.children[1].textContent === doc);
+        if (rowToRemove) rowToRemove.remove();
+        updateIndexes();
       }
     }
 
@@ -190,4 +194,3 @@
   </script>
 </body>
 </html>
-
