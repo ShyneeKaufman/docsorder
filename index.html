@@ -8,12 +8,13 @@
     .container-wrapper { flex: 1; display: flex; overflow: hidden; }
     .container { display: flex; flex-grow: 1; overflow: hidden; }
     .table-container, .list-container { flex: 1; min-height: 400px; border: 1px dashed #aaa; padding: 10px; overflow-y: auto; resize: horizontal; min-width: 200px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: auto; }
     th, td { border: 1px solid #000; padding: 8px; text-align: center; }
     th { background-color: #f2f2f2; }
     .draggable-item { padding: 8px; border: 1px solid #ccc; background: #fafafa; margin-bottom: 5px; cursor: grab; display: flex; justify-content: space-between; align-items: center; }
     .draggable-item:active { cursor: grabbing; }
-    .delete-btn { background-color: red; color: white; border: none; padding: 4px 8px; cursor: pointer; border-radius: 4px; }
+    .delete-btn, .edit-btn { background-color: red; color: white; border: none; padding: 4px 8px; cursor: pointer; border-radius: 4px; margin-left: 5px; }
+    .edit-btn { background-color: orange; }
     .droppable-hover { background-color: #e0ffe0; }
     tr.dragging { opacity: 0.5; }
   </style>
@@ -33,7 +34,7 @@
               <th>№ п/п</th>
               <th>Назва документу</th>
               <th>Дата включення</th>
-              <th style="width: 20%">К-ть аркушів</th>
+              <th style="min-width: 100px">К-ть аркушів</th>
               <th>Примітка</th>
               <th>Дія</th>
             </tr>
@@ -113,8 +114,17 @@
           renderList();
           updateSelectOptions();
         };
-        item.appendChild(delBtn);
 
+        const editBtn = document.createElement('button');
+        editBtn.textContent = '✎';
+        editBtn.className = 'edit-btn';
+        editBtn.onclick = () => {
+          docSelect.value = index;
+          document.getElementById('newName').value = uniqueDocuments[index];
+        };
+
+        item.appendChild(editBtn);
+        item.appendChild(delBtn);
         docList.appendChild(item);
       });
     }
@@ -159,11 +169,9 @@
       e.preventDefault();
       const doc = e.dataTransfer.getData('text/plain');
       const source = e.dataTransfer.getData('source');
-      const rows = [...docBody.querySelectorAll('tr')];
-      const existing = rows.find(r => r.children[1].textContent === doc);
 
       if (source === 'table') {
-        const dragged = rows.find(r => r.classList.contains('dragging'));
+        const dragged = [...docBody.querySelectorAll('tr')].find(r => r.classList.contains('dragging'));
         const dropTarget = e.target.closest('tr');
         if (dragged && dropTarget && dragged !== dropTarget) {
           docBody.insertBefore(dragged, dropTarget.nextSibling);
@@ -172,7 +180,7 @@
         return;
       }
 
-      if (existing) return;
+      if ([...docBody.querySelectorAll('tr')].some(r => r.children[1].textContent === doc)) return;
 
       const row = document.createElement('tr');
       row.draggable = true;
@@ -186,7 +194,7 @@
         <td></td>
         <td>${doc}</td>
         <td><input type="date" value="${today}"/></td>
-        <td><input type="number" value="1" min="1"/></td>
+        <td><input type="number" value="1" min="1" style="width: 100%"/></td>
         <td></td>
         <td><button class="delete-btn" onclick="this.closest('tr').remove(); updateIndexes();">Видалити</button></td>
       `;
@@ -213,9 +221,11 @@
     }
 
     function copyTable() {
-      const rows = [...document.querySelectorAll('#docTable tr')];
-      const tableText = rows.map(row => [...row.children].map(td => td.innerText).join('\t')).join('\n');
-      navigator.clipboard.writeText(tableText).then(() => alert("Таблиця скопійована!"));
+      const table = document.getElementById('docTable');
+      const html = table.outerHTML;
+      const blob = new Blob([html], { type: 'text/html' });
+      const data = [new ClipboardItem({ 'text/html': blob })];
+      navigator.clipboard.write(data).then(() => alert("HTML таблиця скопійована! Вставте у Word."));
     }
 
     window.addEventListener('DOMContentLoaded', () => {
