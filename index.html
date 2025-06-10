@@ -11,9 +11,8 @@
     table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
     th, td { border: 1px solid #000; padding: 8px; text-align: center; }
     th { background-color: #f2f2f2; }
-    .draggable-item { padding: 8px; border: 1px solid #ccc; background: #fafafa; margin-bottom: 5px; cursor: grab; }
+    .draggable-item { padding: 8px; border: 1px solid #ccc; background: #fafafa; margin-bottom: 5px; cursor: grab; display: flex; justify-content: space-between; align-items: center; }
     .draggable-item:active { cursor: grabbing; }
-    .settings { padding: 10px; border-top: 1px solid #ccc; }
     .delete-btn { background-color: red; color: white; border: none; padding: 4px 8px; cursor: pointer; border-radius: 4px; }
     .droppable-hover { background-color: #e0ffe0; }
     tr.dragging { opacity: 0.5; }
@@ -34,7 +33,7 @@
               <th>№ п/п</th>
               <th>Назва документу</th>
               <th>Дата включення</th>
-              <th>К-ть аркушів</th>
+              <th style="width: 20%">К-ть аркушів</th>
               <th>Примітка</th>
               <th>Дія</th>
             </tr>
@@ -63,7 +62,7 @@
   </div>
 
   <script>
-    let uniqueDocuments = [...new Set([
+    let uniqueDocuments = JSON.parse(localStorage.getItem('documents')) || [...new Set([
       "Заява про надання соціальних послуг ХХХ",
       "Акт оцінки потреб сім’ї ХХХ",
       "Висновок оцінки потреб сім’ї ХХХ",
@@ -88,6 +87,10 @@
     const docList = document.getElementById('docList');
     const docSelect = document.getElementById('docSelect');
 
+    function saveDocuments() {
+      localStorage.setItem('documents', JSON.stringify(uniqueDocuments));
+    }
+
     function renderList() {
       docList.innerHTML = '';
       uniqueDocuments.forEach((doc, index) => {
@@ -100,11 +103,26 @@
           e.dataTransfer.setData('text/plain', doc);
           e.dataTransfer.setData('source', 'list');
         });
+
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '✖';
+        delBtn.className = 'delete-btn';
+        delBtn.onclick = () => {
+          uniqueDocuments.splice(index, 1);
+          saveDocuments();
+          renderList();
+          updateSelectOptions();
+        };
+        item.appendChild(delBtn);
+
         docList.appendChild(item);
       });
     }
 
-    function renderTable() { docBody.innerHTML = ''; }
+    function renderTable() {
+      docBody.innerHTML = '';
+      updateIndexes();
+    }
 
     function updateSelectOptions() {
       docSelect.innerHTML = '';
@@ -121,6 +139,7 @@
       const newName = document.getElementById('newName').value.trim();
       if (newName) {
         uniqueDocuments[index] = newName;
+        saveDocuments();
         renderList();
         updateSelectOptions();
       }
@@ -130,6 +149,7 @@
       const newDoc = document.getElementById('newDoc').value.trim();
       if (newDoc) {
         uniqueDocuments.push(newDoc);
+        saveDocuments();
         renderList();
         updateSelectOptions();
       }
@@ -139,7 +159,19 @@
       e.preventDefault();
       const doc = e.dataTransfer.getData('text/plain');
       const source = e.dataTransfer.getData('source');
-      const existing = [...docBody.querySelectorAll('tr')].some(row => row.children[1].textContent === doc);
+      const rows = [...docBody.querySelectorAll('tr')];
+      const existing = rows.find(r => r.children[1].textContent === doc);
+
+      if (source === 'table') {
+        const dragged = rows.find(r => r.classList.contains('dragging'));
+        const dropTarget = e.target.closest('tr');
+        if (dragged && dropTarget && dragged !== dropTarget) {
+          docBody.insertBefore(dragged, dropTarget.nextSibling);
+        }
+        updateIndexes();
+        return;
+      }
+
       if (existing) return;
 
       const row = document.createElement('tr');
@@ -148,8 +180,8 @@
         e.dataTransfer.setData('text/plain', doc);
         e.dataTransfer.setData('source', 'table');
         row.classList.add('dragging');
-        setTimeout(() => row.classList.remove('dragging'), 0);
       });
+      row.addEventListener('dragend', () => row.classList.remove('dragging'));
       row.innerHTML = `
         <td></td>
         <td>${doc}</td>
