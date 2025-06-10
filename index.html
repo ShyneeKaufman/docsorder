@@ -17,6 +17,10 @@
     .edit-btn { background-color: orange; }
     .droppable-hover { background-color: #e0ffe0; }
     tr.dragging { opacity: 0.5; }
+    .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); }
+    .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 500px; }
+    .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+    .close:hover { color: black; }
   </style>
 </head>
 <body>
@@ -49,21 +53,24 @@
 
   <div class="settings">
     <h3>Налаштування документів</h3>
-    <label for="docSelect">Оберіть документ для редагування:</label>
-    <select id="docSelect"></select>
-    <br><br>
-    <label for="newName">Нова назва:</label>
-    <input type="text" id="newName" placeholder="Введіть нову назву" />
-    <br><br>
-    <button onclick="renameDocument()">Змінити назву</button>
-    <br><br>
     <h4>Додати новий документ</h4>
     <input type="text" id="newDoc" placeholder="Назва нового документу" />
     <button onclick="addNewDocument()">Додати</button>
   </div>
 
+  <!-- Модальное окно для редактирования -->
+  <div id="editModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeModal()">&times;</span>
+      <h3>Редагувати документ</h3>
+      <input type="text" id="editDocName" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+      <button onclick="saveEditedDocument()">Зберегти</button>
+    </div>
+  </div>
+
   <script>
-    let uniqueDocuments = JSON.parse(localStorage.getItem('documents')) || [...new Set([
+    // Загрузка документов из localStorage или использование стандартного списка
+    let uniqueDocuments = JSON.parse(localStorage.getItem('documents')) || [
       "Заява про надання соціальних послуг ХХХ",
       "Акт оцінки потреб сім’ї ХХХ",
       "Висновок оцінки потреб сім’ї ХХХ",
@@ -73,7 +80,7 @@
       "Копія карти платника податків YYY",
       "Копія паспорту YYY",
       "Декларація про доходи та майновий стан особи, яка потребує надання соціальних послуг ХХХ",
-      "Рішення про надання в наданні соціальних послуг",
+      "Рішення про надання соціальних послуг",
       "Рішення про припинення надання соціальних послуг",
       "Повідомлення про сім’ю яка перебуває в складних життєвих обставинах №425/01-17",
       "Копія свідоцтва про народження Кічук А.В.",
@@ -81,15 +88,33 @@
       "Копія довідки про внесення відомостей до єдиного державного демографічного реєстру. №1303026-2023",
       "Копія ID Картки Кічук О.С.",
       "Копія рішення Виконавчого Комітету Таращанської міської ради №305-VIII"
-    ])];
+    ];
+
+    // Загрузка таблицы документов из localStorage
+    let tableDocuments = JSON.parse(localStorage.getItem('tableDocuments')) || [];
 
     const today = new Date().toISOString().split('T')[0];
     const docBody = document.getElementById('docBody');
     const docList = document.getElementById('docList');
-    const docSelect = document.getElementById('docSelect');
+    const editModal = document.getElementById('editModal');
+    let currentEditIndex = null;
+    let currentEditSource = null; // 'list' или 'table'
 
     function saveDocuments() {
       localStorage.setItem('documents', JSON.stringify(uniqueDocuments));
+      localStorage.setItem('tableDocuments', JSON.stringify(getTableData()));
+    }
+
+    function getTableData() {
+      const rows = [...docBody.querySelectorAll('tr')];
+      return rows.map(row => {
+        return {
+          name: row.children[1].textContent,
+          date: row.children[2].querySelector('input').value,
+          sheets: row.children[3].querySelector('input').value,
+          note: row.children[4].textContent
+        };
+      });
     }
 
     function renderList() {
@@ -105,64 +130,95 @@
           e.dataTransfer.setData('source', 'list');
         });
 
-        const delBtn = document.createElement('button');
-        delBtn.textContent = '✖';
-        delBtn.className = 'delete-btn';
-        delBtn.onclick = () => {
-          uniqueDocuments.splice(index, 1);
-          saveDocuments();
-          renderList();
-          updateSelectOptions();
-        };
-
+        const btnContainer = document.createElement('div');
+        
         const editBtn = document.createElement('button');
         editBtn.textContent = '✎';
         editBtn.className = 'edit-btn';
-        editBtn.onclick = () => {
-          docSelect.value = index;
-          document.getElementById('newName').value = uniqueDocuments[index];
+        editBtn.onclick = (e) => {
+          e.stopPropagation();
+          currentEditIndex = index;
+          currentEditSource = 'list';
+          document.getElementById('editDocName').value = doc;
+          editModal.style.display = 'block';
         };
 
-        item.appendChild(editBtn);
-        item.appendChild(delBtn);
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '✖';
+        delBtn.className = 'delete-btn';
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          uniqueDocuments.splice(index, 1);
+          saveDocuments();
+          renderList();
+        };
+
+        btnContainer.appendChild(editBtn);
+        btnContainer.appendChild(delBtn);
+        item.appendChild(btnContainer);
         docList.appendChild(item);
       });
     }
 
     function renderTable() {
       docBody.innerHTML = '';
+      if (tableDocuments.length > 0) {
+        tableDocuments.forEach(doc => {
+          addDocumentToTable(doc.name, doc.date, doc.sheets, doc.note);
+        });
+      }
       updateIndexes();
     }
 
-    function updateSelectOptions() {
-      docSelect.innerHTML = '';
-      uniqueDocuments.forEach((doc, index) => {
-        const option = document.createElement('option');
-        option.value = index;
-        option.textContent = doc;
-        docSelect.appendChild(option);
+    function addDocumentToTable(name, date = today, sheets = '1', note = '') {
+      const row = document.createElement('tr');
+      row.draggable = true;
+      row.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', name);
+        e.dataTransfer.setData('source', 'table');
+        row.classList.add('dragging');
       });
+      row.addEventListener('dragend', () => row.classList.remove('dragging'));
+      row.innerHTML = `
+        <td></td>
+        <td>${name}</td>
+        <td><input type="date" value="${date}"/></td>
+        <td><input type="number" value="${sheets}" min="1" style="width: 100%"/></td>
+        <td>${note}</td>
+        <td>
+          <button class="edit-btn" onclick="editTableDocument(this)">✎</button>
+          <button class="delete-btn" onclick="this.closest('tr').remove(); updateIndexes(); saveDocuments();">✖</button>
+        </td>
+      `;
+      docBody.appendChild(row);
+      updateIndexes();
     }
 
-    function renameDocument() {
-      const index = docSelect.value;
-      const newName = document.getElementById('newName').value.trim();
+    function editTableDocument(button) {
+      const row = button.closest('tr');
+      currentEditIndex = [...docBody.querySelectorAll('tr')].indexOf(row);
+      currentEditSource = 'table';
+      document.getElementById('editDocName').value = row.children[1].textContent;
+      editModal.style.display = 'block';
+    }
+
+    function saveEditedDocument() {
+      const newName = document.getElementById('editDocName').value.trim();
       if (newName) {
-        uniqueDocuments[index] = newName;
+        if (currentEditSource === 'list') {
+          uniqueDocuments[currentEditIndex] = newName;
+          renderList();
+        } else if (currentEditSource === 'table') {
+          const rows = [...docBody.querySelectorAll('tr')];
+          rows[currentEditIndex].children[1].textContent = newName;
+        }
         saveDocuments();
-        renderList();
-        updateSelectOptions();
+        closeModal();
       }
     }
 
-    function addNewDocument() {
-      const newDoc = document.getElementById('newDoc').value.trim();
-      if (newDoc) {
-        uniqueDocuments.push(newDoc);
-        saveDocuments();
-        renderList();
-        updateSelectOptions();
-      }
+    function closeModal() {
+      editModal.style.display = 'none';
     }
 
     function handleDrop(e) {
@@ -177,29 +233,12 @@
           docBody.insertBefore(dragged, dropTarget.nextSibling);
         }
         updateIndexes();
+        saveDocuments();
         return;
       }
 
-      if ([...docBody.querySelectorAll('tr')].some(r => r.children[1].textContent === doc)) return;
-
-      const row = document.createElement('tr');
-      row.draggable = true;
-      row.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', doc);
-        e.dataTransfer.setData('source', 'table');
-        row.classList.add('dragging');
-      });
-      row.addEventListener('dragend', () => row.classList.remove('dragging'));
-      row.innerHTML = `
-        <td></td>
-        <td>${doc}</td>
-        <td><input type="date" value="${today}"/></td>
-        <td><input type="number" value="1" min="1" style="width: 100%"/></td>
-        <td></td>
-        <td><button class="delete-btn" onclick="this.closest('tr').remove(); updateIndexes();">Видалити</button></td>
-      `;
-      docBody.appendChild(row);
-      updateIndexes();
+      addDocumentToTable(doc);
+      saveDocuments();
     }
 
     function handleRemove(e) {
@@ -211,6 +250,7 @@
         const rowToRemove = rows.find(r => r.children[1].textContent === doc);
         if (rowToRemove) rowToRemove.remove();
         updateIndexes();
+        saveDocuments();
       }
     }
 
@@ -218,6 +258,16 @@
       document.querySelectorAll('#docBody tr').forEach((row, index) => {
         row.children[0].textContent = index + 1;
       });
+    }
+
+    function addNewDocument() {
+      const newDoc = document.getElementById('newDoc').value.trim();
+      if (newDoc) {
+        uniqueDocuments.push(newDoc);
+        saveDocuments();
+        renderList();
+        document.getElementById('newDoc').value = '';
+      }
     }
 
     function copyTable() {
@@ -231,8 +281,14 @@
     window.addEventListener('DOMContentLoaded', () => {
       renderList();
       renderTable();
-      updateSelectOptions();
     });
+
+    // Закрытие модального окна при клике вне его
+    window.onclick = function(event) {
+      if (event.target == editModal) {
+        closeModal();
+      }
+    }
   </script>
 </body>
 </html>
