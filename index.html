@@ -21,6 +21,7 @@
     .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 500px; }
     .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
     .close:hover { color: black; }
+    .replace-panel { margin-top: 20px; padding: 10px; border: 1px solid #ddd; background: #f9f9f9; }
   </style>
 </head>
 <body>
@@ -32,6 +33,10 @@
       </div>
       <div class="table-container" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
         <h2>Опис документів</h2>
+        <div class="replace-panel">
+          <label>Замінити XXX на: <input type="text" id="replaceValue" placeholder="Наприклад: Кічук О.С."></label>
+          <button onclick="applyReplace()">Застосувати</button>
+        </div>
         <table id="docTable">
           <thead>
             <tr>
@@ -115,6 +120,14 @@
           note: row.children[4].textContent
         };
       });
+    }
+
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}.${month}.${year}`;
     }
 
     function renderList() {
@@ -270,12 +283,37 @@
       }
     }
 
+    function applyReplace() {
+      const replaceValue = document.getElementById('replaceValue').value.trim();
+      if (!replaceValue) return;
+      
+      const rows = [...docBody.querySelectorAll('tr')];
+      rows.forEach(row => {
+        const nameCell = row.children[1];
+        nameCell.textContent = nameCell.textContent.replace(/ХХХ/g, replaceValue)
+                                                 .replace(/YYY/g, replaceValue);
+      });
+      saveDocuments();
+    }
+
     function copyTable() {
-      const table = document.getElementById('docTable');
-      const html = table.outerHTML;
-      const blob = new Blob([html], { type: 'text/html' });
-      const data = [new ClipboardItem({ 'text/html': blob })];
-      navigator.clipboard.write(data).then(() => alert("HTML таблиця скопійована! Вставте у Word."));
+      const replaceValue = document.getElementById('replaceValue').value.trim();
+      const rows = [...docBody.querySelectorAll('tr')];
+      
+      let result = '';
+      rows.forEach((row, index) => {
+        const name = row.children[1].textContent
+                          .replace(/ХХХ/g, replaceValue)
+                          .replace(/YYY/g, replaceValue);
+        const date = formatDate(row.children[2].querySelector('input').value);
+        const sheets = row.children[3].querySelector('input').value;
+        
+        result += `${index + 1}.\n${name}\n${date}\n${sheets}\n\n\n`;
+      });
+      
+      navigator.clipboard.writeText(result).then(() => {
+        alert("Таблицю скопійовано у потрібному форматі!");
+      });
     }
 
     window.addEventListener('DOMContentLoaded', () => {
