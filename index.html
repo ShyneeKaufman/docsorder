@@ -23,6 +23,9 @@
     .close:hover { color: black; }
     .replace-panel, .date-replace-panel { margin-top: 20px; padding: 10px; border: 1px solid #ddd; background: #f9f9f9; }
     #searchDoc { margin-bottom: 10px; }
+    .export-panel { margin-top: 20px; padding: 10px; border: 1px solid #ddd; background: #f9f9f9; }
+    .export-format { margin-top: 10px; }
+    textarea { width: 100%; height: 100px; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -59,6 +62,17 @@
         </table>
         <br />
         <button onclick="copyTable()">Копіювати таблицю</button>
+        
+        <div class="export-panel">
+          <h3>Експорт таблиці</h3>
+          <div class="export-format">
+            <label><input type="radio" name="exportFormat" value="txt" checked> TXT (текстовий)</label>
+            <label><input type="radio" name="exportFormat" value="csv"> CSV</label>
+            <label><input type="radio" name="exportFormat" value="custom"> Власний формат</label>
+          </div>
+          <textarea id="customFormat" placeholder="Введіть свій шаблон для експорту. Використовуйте {index}, {name}, {date}, {sheets}, {note} для підстановки значень. Наприклад: {index}. {name} від {date}">{index}.\n{name}\n{date}\n{sheets}\n\n\n</textarea>
+          <button onclick="exportTable()">Експортувати у файл</button>
+        </div>
       </div>
     </div>
   </div>
@@ -311,6 +325,15 @@
       renderList(filteredDocs);
     }
 
+    function formatDate(dateString) {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}.${month}.${year}`;
+    }
+
     function copyTable() {
       const replaceValue = document.getElementById('replaceValueFrom').value.trim();
       const rows = [...docBody.querySelectorAll('tr')];
@@ -328,6 +351,72 @@
       navigator.clipboard.writeText(result).then(() => {
         alert("Таблицю скопійовано у потрібному форматі!");
       });
+    }
+
+    function exportTable() {
+      const format = document.querySelector('input[name="exportFormat"]:checked').value;
+      const replaceFrom = document.getElementById('replaceValueFrom').value.trim();
+      const replaceTo = document.getElementById('replaceValueTo').value.trim();
+      const rows = [...docBody.querySelectorAll('tr')];
+      
+      let content = '';
+      let filename = 'documents_export';
+      
+      if (format === 'txt') {
+        filename += '.txt';
+        rows.forEach((row, index) => {
+          const name = row.children[1].textContent.replace(new RegExp(replaceFrom, 'g'), replaceTo);
+          const date = formatDate(row.children[2].querySelector('input').value);
+          const sheets = row.children[3].querySelector('input').value;
+          const note = row.children[4].textContent;
+          
+          content += `${index + 1}.\n${name}\n${date}\n${sheets}\n${note}\n\n\n`;
+        });
+      } 
+      else if (format === 'csv') {
+        filename += '.csv';
+        content = "№ п/п;Назва документу;Дата включення;К-ть аркушів;Примітка\n";
+        rows.forEach((row, index) => {
+          const name = row.children[1].textContent.replace(new RegExp(replaceFrom, 'g'), replaceTo);
+          const date = formatDate(row.children[2].querySelector('input').value);
+          const sheets = row.children[3].querySelector('input').value;
+          const note = row.children[4].textContent;
+          
+          content += `${index + 1};"${name}";${date};${sheets};"${note}"\n`;
+        });
+      }
+      else if (format === 'custom') {
+        filename += '.txt';
+        const template = document.getElementById('customFormat').value;
+        rows.forEach((row, index) => {
+          const name = row.children[1].textContent.replace(new RegExp(replaceFrom, 'g'), replaceTo);
+          const date = formatDate(row.children[2].querySelector('input').value);
+          const sheets = row.children[3].querySelector('input').value;
+          const note = row.children[4].textContent;
+          
+          let rowContent = template
+            .replace(/{index}/g, index + 1)
+            .replace(/{name}/g, name)
+            .replace(/{date}/g, date)
+            .replace(/{sheets}/g, sheets)
+            .replace(/{note}/g, note);
+            
+          content += rowContent;
+        });
+      }
+      
+      // Создаем Blob и ссылку для скачивания
+      const blob = new Blob([content], { type: format === 'csv' ? 'text/csv;charset=utf-8;' : 'text/plain;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
 
     window.addEventListener('DOMContentLoaded', () => {
