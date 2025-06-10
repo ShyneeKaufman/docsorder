@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Формування опису документів</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+    .container-wrapper { flex: 1; display: flex; overflow: hidden; }
+    .container { display: flex; flex-grow: 1; overflow: hidden; }
+    .table-container, .list-container { flex: 1; min-height: 400px; border: 1px dashed #aaa; padding: 10px; overflow-y: auto; resize: horizontal; min-width: 200px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+    th, td { border: 1px solid #000; padding: 8px; text-align: center; }
+    th { background-color: #f2f2f2; }
+    .draggable-item { padding: 8px; border: 1px solid #ccc; background: #fafafa; margin-bottom: 5px; cursor: grab; }
+    .draggable-item:active { cursor: grabbing; }
+    .settings { padding: 10px; border-top: 1px solid #ccc; }
+    .delete-btn { background-color: red; color: white; border: none; padding: 4px 8px; cursor: pointer; border-radius: 4px; }
+    .droppable-hover { background-color: #e0ffe0; }
+  </style>
+</head>
+<body>
+  <div class="container-wrapper">
+    <div class="container">
+      <div class="list-container" ondragover="event.preventDefault()" ondrop="handleRemove(event)">
+        <h3>Документи</h3>
+        <div id="docList"></div>
+      </div>
+      <div class="table-container" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
+        <h2>Опис документів</h2>
+        <table id="docTable">
+          <thead>
+            <tr>
+              <th>№ п/п</th>
+              <th>Назва документу</th>
+              <th>Дата включення</th>
+              <th>К-ть аркушів</th>
+              <th>Примітка</th>
+              <th>Дія</th>
+            </tr>
+          </thead>
+          <tbody id="docBody"></tbody>
+        </table>
+        <br />
+        <button onclick="copyTable()">Копіювати таблицю</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings">
+    <h3>Налаштування документів</h3>
+    <label for="docSelect">Оберіть документ для редагування:</label>
+    <select id="docSelect"></select>
+    <br><br>
+    <label for="newName">Нова назва:</label>
+    <input type="text" id="newName" placeholder="Введіть нову назву" />
+    <br><br>
+    <button onclick="renameDocument()">Змінити назву</button>
+    <br><br>
+    <h4>Додати новий документ</h4>
+    <input type="text" id="newDoc" placeholder="Назва нового документу" />
+    <button onclick="addNewDocument()">Додати</button>
+  </div>
+
+  <script>
+    let uniqueDocuments = [...new Set([
+      "Заява про надання соціальних послуг ХХХ",
+      "Акт оцінки потреб сім’ї ХХХ",
+      "Висновок оцінки потреб сім’ї ХХХ",
+      "Копія свідоцтва про народження дитини ХХХ",
+      "Копія картки платника податків ХХХ",
+      "Копія паспорту ХХХ",
+      "Копія карти платника податків YYY",
+      "Копія паспорту YYY",
+      "Декларація про доходи та майновий стан особи, яка потребує надання соціальних послуг ХХХ",
+      "Рішення про надання в наданні соціальних послуг",
+      "Рішення про припинення надання соціальних послуг",
+      "Повідомлення про сім’ю яка перебуває в складних життєвих обставинах №425/01-17",
+      "Копія свідоцтва про народження Кічук А.В.",
+      "Копія картки платника податків Кічук О.С.",
+      "Копія довідки про внесення відомостей до єдиного державного демографічного реєстру. №1303026-2023",
+      "Копія ID Картки Кічук О.С.",
+      "Копія рішення Виконавчого Комітету Таращанської міської ради №305-VIII"
+    ])];
+
+    const today = new Date().toISOString().split('T')[0];
+    const docBody = document.getElementById('docBody');
+    const docList = document.getElementById('docList');
+    const docSelect = document.getElementById('docSelect');
+
+    function renderList() {
+      docList.innerHTML = '';
+      uniqueDocuments.forEach((doc, index) => {
+        const item = document.createElement('div');
+        item.classList.add('draggable-item');
+        item.textContent = doc;
+        item.draggable = true;
+        item.dataset.docIndex = index;
+        item.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', doc);
+        });
+        docList.appendChild(item);
+      });
+    }
+
+    function renderTable() { docBody.innerHTML = ''; }
+
+    function updateSelectOptions() {
+      docSelect.innerHTML = '';
+      uniqueDocuments.forEach((doc, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = doc;
+        docSelect.appendChild(option);
+      });
+    }
+
+    function renameDocument() {
+      const index = docSelect.value;
+      const newName = document.getElementById('newName').value.trim();
+      if (newName) {
+        uniqueDocuments[index] = newName;
+        renderList();
+        updateSelectOptions();
+      }
+    }
+
+    function addNewDocument() {
+      const newDoc = document.getElementById('newDoc').value.trim();
+      if (newDoc) {
+        uniqueDocuments.push(newDoc);
+        renderList();
+        updateSelectOptions();
+      }
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      const doc = e.dataTransfer.getData('text/plain');
+      const row = document.createElement('tr');
+      row.draggable = true;
+      row.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/row', row.innerHTML);
+        row.remove();
+        updateIndexes();
+      });
+      row.innerHTML = `
+        <td></td>
+        <td>${doc}</td>
+        <td><input type="date" value="${today}"/></td>
+        <td><input type="number" value="1" min="1"/></td>
+        <td></td>
+        <td><button class="delete-btn" onclick="this.closest('tr').remove(); updateIndexes();">Видалити</button></td>
+      `;
+      docBody.appendChild(row);
+      updateIndexes();
+    }
+
+    function handleRemove(e) {
+      e.preventDefault();
+      const data = e.dataTransfer.getData('text/row');
+      if (data) {
+        const temp = document.createElement('table');
+        temp.innerHTML = `<tbody>${data}</tbody>`;
+        const content = temp.querySelector('tr td:nth-child(2)').textContent;
+        if (!uniqueDocuments.includes(content)) {
+          uniqueDocuments.push(content);
+          renderList();
+          updateSelectOptions();
+        }
+      }
+    }
+
+    function updateIndexes() {
+      document.querySelectorAll('#docBody tr').forEach((row, index) => {
+        row.children[0].textContent = index + 1;
+      });
+    }
+
+    function copyTable() {
+      const rows = [...document.querySelectorAll('#docTable tr')];
+      const tableText = rows.map(row => [...row.children].map(td => td.innerText).join('\t')).join('\n');
+      navigator.clipboard.writeText(tableText).then(() => alert("Таблиця скопійована!"));
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      renderList();
+      renderTable();
+      updateSelectOptions();
+    });
+  </script>
+</body>
+</html>
+
