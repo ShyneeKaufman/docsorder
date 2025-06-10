@@ -21,7 +21,8 @@
     .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 500px; }
     .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
     .close:hover { color: black; }
-    .replace-panel { margin-top: 20px; padding: 10px; border: 1px solid #ddd; background: #f9f9f9; }
+    .replace-panel, .date-replace-panel { margin-top: 20px; padding: 10px; border: 1px solid #ddd; background: #f9f9f9; }
+    #searchDoc { margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -29,13 +30,18 @@
     <div class="container">
       <div class="list-container" ondragover="event.preventDefault()" ondrop="handleRemove(event)">
         <h3>Документи</h3>
+        <input type="text" id="searchDoc" placeholder="Пошук за назвою документу" oninput="searchDocuments()" />
         <div id="docList"></div>
       </div>
       <div class="table-container" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
         <h2>Опис документів</h2>
         <div class="replace-panel">
-          <label>Замінити XXX на: <input type="text" id="replaceValue" placeholder="Наприклад: Кічук О.С."></label>
+          <label>Замінити ХХХ на: <input type="text" id="replaceValue" placeholder="Наприклад: Кічук О.С."></label>
           <button onclick="applyReplace()">Застосувати</button>
+        </div>
+        <div class="date-replace-panel">
+          <label>Замінити всі дати на: <input type="date" id="replaceDateValue"></label>
+          <button onclick="applyDateReplace()">Застосувати дати</button>
         </div>
         <table id="docTable">
           <thead>
@@ -294,6 +300,24 @@
                                                  .replace(/YYY/g, replaceValue);
       });
       saveDocuments();
+    }
+
+    function applyDateReplace() {
+      const replaceDate = document.getElementById('replaceDateValue').value.trim();
+      if (!replaceDate) return;
+
+      const rows = [...docBody.querySelectorAll('tr')];
+      rows.forEach(row => {
+        const dateCell = row.children[2].querySelector('input');
+        dateCell.value = replaceDate;
+      });
+      saveDocuments();
+    }
+
+    function searchDocuments() {
+      const searchValue = document.getElementById('searchDoc').value.toLowerCase();
+      const filteredDocs = uniqueDocuments.filter(doc => doc.toLowerCase().includes(searchValue));
+      renderList(filteredDocs);
     }
 
     function copyTable() {
