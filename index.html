@@ -62,7 +62,7 @@
         </table>
         <br />
         <button onclick="copyTable()">Копіювати таблицю</button>
-        
+        <button onclick="copyTableHtmlToClipboard()">Копіювати як HTML</button>
         <div class="export-panel">
           <h3>Експорт таблиці</h3>
           <div class="export-format">
@@ -419,12 +419,67 @@
       document.body.removeChild(link);
     }
 
+    // ==== HTML TABLE COPY FUNCTION =====
+    function copyTableHtmlToClipboard() {
+      const rows = [...document.querySelectorAll('#docBody tr')];
+      if (!rows.length) {
+        alert('Таблиця порожня!');
+        return;
+      }
+      let html = `<table style="border-collapse:collapse;background:#fff;font-family:'Times New Roman',Times,serif;width:100%;">`;
+
+      // Заголовок
+      html += `<tr>
+        <td style="border:0.5pt solid #000;padding:5pt;">№ п/п</td>
+        <td style="border:0.5pt solid #000;padding:5pt;">Назва документу</td>
+        <td style="border:0.5pt solid #000;padding:5pt;">Дата включення</td>
+        <td style="border:0.5pt solid #000;padding:5pt;">К-ть аркушів</td>
+        <td style="border:0.5pt solid #000;padding:5pt;">Примітка</td>
+      </tr>`;
+
+      // Данные строк
+      rows.forEach((row, idx) => {
+        const name = row.children[1].textContent;
+        const date = formatDate(row.children[2].querySelector('input').value);
+        const sheets = row.children[3].querySelector('input').value;
+        const note = row.children[4].textContent;
+        html += `<tr>
+          <td style="border:0.5pt solid #000;padding:5pt;">${idx + 1}</td>
+          <td style="border:0.5pt solid #000;padding:5pt;">${name}</td>
+          <td style="border:0.5pt solid #000;padding:5pt;">${date}</td>
+          <td style="border:0.5pt solid #000;padding:5pt;">${sheets}</td>
+          <td style="border:0.5pt solid #000;padding:5pt;">${note}</td>
+        </tr>`;
+      });
+      html += `</table>`;
+
+      // Копируем как HTML в буфер обмена
+      if (navigator.clipboard && window.ClipboardItem) {
+        const blob = new Blob([html], { type: "text/html" });
+        const data = [new ClipboardItem({ "text/html": blob })];
+        navigator.clipboard.write(data).then(() => {
+          alert("HTML-таблиця скопійована! Вставте її у Word або Google Docs.");
+        }, () => {
+          alert("Помилка при копіюванні!");
+        });
+      } else {
+        // Фолбэк для старых браузеров
+        const textarea = document.createElement('textarea');
+        textarea.value = html;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        alert('HTML-код скопійовано як текст.');
+      }
+    }
+    // ==== END HTML TABLE COPY FUNCTION ====
+
     window.addEventListener('DOMContentLoaded', () => {
       renderList();
       renderTable();
     });
 
-    // Закрытие модального окна при клике вне его
     window.onclick = function(event) {
       if (event.target == editModal) {
         closeModal();
