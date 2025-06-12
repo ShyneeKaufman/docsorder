@@ -329,37 +329,31 @@
         alert('Таблиця порожня!');
         return;
       }
-      let html = `<table style="border-collapse:collapse;background:#fff;font-family:'Times New Roman',Times,serif;width:707px;">`;
-      html += `
-        <colgroup>
-          <col style="width:0.26in;">
-          <col style="width:4.69in;">
-          <col style="width:0.85in;">
-          <col style="width:0.56in;">
-          <col style="width:0.43in;">
-        </colgroup>
-      `;
-      html += `<tr>
-        <td style="border:0.5pt solid #000;padding:5pt;">№ п/п</td>
-        <td style="border:0.5pt solid #000;padding:5pt;">Назва документу</td>
-        <td style="border:0.5pt solid #000;padding:5pt;">Дата включення</td>
-        <td style="border:0.5pt solid #000;padding:5pt;">К-ть аркушів</td>
-        <td style="border:0.5pt solid #000;padding:5pt;">Примітка</td>
-      </tr>`;
+      let html = `<table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; width: 100%;">`;
+      html += `<thead>
+        <tr>
+          <th>№ п/п</th>
+          <th>Назва документу</th>
+          <th>Дата включення</th>
+          <th>К-ть аркушів</th>
+          <th>Примітка</th>
+        </tr>
+      </thead>
+      <tbody>`;
       rows.forEach((row, idx) => {
         const name = row.children[1].textContent;
         const date = formatDate(row.children[2].querySelector('input').value);
         const sheets = row.children[3].querySelector('input').value;
         const note = row.children[4].textContent;
         html += `<tr>
-          <td style="border:0.5pt solid #000;padding:5pt;">${idx + 1}</td>
-          <td style="border:0.5pt solid #000;padding:5pt;">${name}</td>
-          <td style="border:0.5pt solid #000;padding:5pt;">${date}</td>
-          <td style="border:0.5pt solid #000;padding:5pt;">${sheets}</td>
-          <td style="border:0.5pt solid #000;padding:5pt;">${note}</td>
+          <td>${idx + 1}</td>
+          <td>${name}</td>
+          <td>${date}</td>
+          <td>${sheets}</td>
+          <td>${note}</td>
         </tr>`;
       });
-      html += `</table>`;
+      html += `</tbody></table>`;
       if (navigator.clipboard && window.ClipboardItem) {
         const blob = new Blob([html], { type: "text/html" });
         const data = [new ClipboardItem({ "text/html": blob })];
